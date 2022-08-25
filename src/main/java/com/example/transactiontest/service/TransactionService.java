@@ -8,26 +8,20 @@ import com.example.transactiontest.model.dto.*;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
-import java.util.stream.Collectors;
 
 import static java.util.stream.Collectors.*;
-import static java.util.stream.Collectors.toList;
 
 @Service
 public class TransactionService {
 
 
-
     public Object convertTransactionValue(TransactionRequest transactionRequest) {
 
         Map<String, CustomerOrderDto> mapOutputs = new HashMap<>();
-
-        if(transactionRequest != null) {
+        if (transactionRequest != null) {
             List<TransactionDetail> dataInputs = transactionRequest.getTransactionDetails();
-            if(dataInputs != null && dataInputs.size() > 0) {
-
-                for(TransactionDetail dataInput : dataInputs) {
-
+            if (dataInputs != null && dataInputs.size() > 0) {
+                for (TransactionDetail dataInput : dataInputs) {
                     ItemDto itemDto = new ItemDto();
                     itemDto.setName(dataInput.getProductName());
                     itemDto.setCode(dataInput.getProductCode());
@@ -40,27 +34,25 @@ public class TransactionService {
                     orderDto.setId(dataInput.getOrderId());
                     orderDto.setItems(itemDtos);
 
-                    if(mapOutputs.get(dataInput.getEmail()) != null) {
+                    if (mapOutputs.get(dataInput.getEmail()) != null) {
                         boolean canGroup = false;
-                        for(OrderDto order : mapOutputs.get(dataInput.getEmail()).getOrders()){
-                            if(order.getId() == dataInput.getOrderId()) {
+                        for (OrderDto order : mapOutputs.get(dataInput.getEmail()).getOrders()){
+                            if(Objects.equals(order.getId(), dataInput.getOrderId())) {
                                 order.getItems().add(itemDto);
                                 canGroup = true;
                                 break;
                             }
                         }
-                        if(!canGroup) {
+                        if (!canGroup) {
                             mapOutputs.get(dataInput.getEmail()).getOrders().add(orderDto);
                         }
                         continue;
                     }
-
                     CustomerOrderDto customerOrderDto = new CustomerOrderDto();
                     customerOrderDto.setName(dataInput.getName());
                     List<OrderDto> orderDtos = new ArrayList<>();
                     orderDtos.add(orderDto);
                     customerOrderDto.setOrders(orderDtos);
-
                     mapOutputs.put(dataInput.getEmail(), customerOrderDto);
                 }
             }
@@ -70,28 +62,7 @@ public class TransactionService {
 
     public Object convertTransactionValue_v2(TransactionRequest transactionRequest){
 
-        List<TransactionDetail> transactionDetails = transactionRequest.getTransactionDetails();
-
-        //Group by name and skip email
-        Map<String, List<TransactionDetail>> outputDatas =
-                transactionDetails
-                .stream()
-                .collect(Collectors
-                        .groupingBy(
-                                TransactionDetail::getEmail
-                        )
-                );
-
-        //show list order details
-        List<OrderDto> orderDtos =
-                transactionDetails
-                        .stream()
-                        .map(TransactionService::apply)
-                        .collect(Collectors.toList())
-                ;
-
-        //Template  -   Foo(prefix, sector, count)
-        /*
+        /**Template  -   Foo(prefix, sector, count)
         Map<String, Map<String, Integer>> result = foos.stream()
                 .collect(
                         //Step 1 - group by prefix. Outer map key is prefix.
@@ -108,33 +79,27 @@ public class TransactionService {
                 );
         */
 
-        /*Map<String, List<CustomerOrderDto>> outputOrderDtos =
-                transactionDetails
-                        .stream()
-                        .collect(Collectors
-                                .groupingBy(transactionDetail -> )
-                        )
-                ;*/
-
-        List<TransactionDetail> transactionDetailList = transactionDetails
+        List<TransactionDetail> transactionDetails = transactionRequest.getTransactionDetails();
+        Map<String, CustomerOrderDto> customerOrderDtoList = transactionDetails
                 .stream()
-                .collect(
-                        groupingBy(TransactionDetail::getEmail, collectingAndThen(
-                                toList(), objects -> {
-
-                                    return null;
-                                }
-
+                .collect(groupingBy(TransactionDetail::getEmail, collectingAndThen(toList(),transactions -> {
+                                            Map<Long, OrderDto> mapOrder = transactions
+                                                    .stream()
+                                                    .collect(groupingBy(TransactionDetail::getOrderId,collectingAndThen(toList(),products -> {
+                                                                        List<ItemDto> items = products.stream().map(ItemDto::new).collect(toList());
+                                                                        Long id = products.get(0).getOrderId();
+                                                                        return new OrderDto(id, items);
+                                                                    })
+                                                            )
+                                                    );
+                                            String name = transactions.get(0).getEmail();
+                                            List<OrderDto> orders = new ArrayList<>(mapOrder.values());
+                                            return new CustomerOrderDto(name, orders);
+                                        }
                                 )
                         )
-
-                )
-                ;
-
-
-
-        return outputDatas;
-
+                );
+        return customerOrderDtoList;
     }
 
     public Map<String, CustomerOrder> getAllCustomerOrder() {
@@ -149,44 +114,31 @@ public class TransactionService {
                 .stream()
                 .collect(
                         groupingBy(
-                                RawProductInfo::getEmail,
+                                RawProductInfo::getEmail, 
                                 collectingAndThen(
                                         toList(),
                                         transactions -> {
-                                            Map<Long, Order> mapOrder = transactions
-                                                    .stream()
-                                                    .collect(
-                                                            groupingBy(
-                                                                    RawProductInfo::getOrderId,
-                                                                    collectingAndThen(
-                                                                            toList(),
-                                                                            products -> {
-                                                                                List<Product> items = products.stream().map(Product::new).collect(toList());
-                                                                                Long id = products.get(0).getOrderId();
-                                                                                return new Order(id, items);
-                                                                            })
-                                                            )
-                                                    );
-                                            String name = transactions.get(0).getEmail();
-                                            List<Order> orders = new ArrayList<>(mapOrder.values());
-                                            return new CustomerOrder(name, orders);
+                        Map<Long, Order> mapOrder = transactions
+                                .stream()
+                                .collect(
+                                        groupingBy(
+                                                RawProductInfo::getOrderId,
+                                                collectingAndThen(
+                                                        toList(),
+                                                        products -> {
+                                                            List<Product> items = products.stream().map(Product::new).collect(toList());
+                                                            Long id = products.get(0).getOrderId();
+                                                            return new Order(id, items);
+                                                        })
+                                        )
+                                );
+                        String name = transactions.get(0).getEmail();
+                        List<Order> orders = new ArrayList<>(mapOrder.values());
+                        return new CustomerOrder(name, orders);
                                         }
                                 )
                         )
                 );
     }
-
-
-    private static OrderDto apply(TransactionDetail element) {
-        OrderDto orderDto = new OrderDto();
-        List<ItemDto> itemDtos = new ArrayList<>();
-        ItemDto itemDto = new ItemDto(element.getProductName(), element.getProductCode(), element.getOrderQuantity());
-        itemDtos.add(itemDto);
-        orderDto.setId(element.getOrderId());
-        orderDto.setItems(itemDtos);
-        return orderDto;
-    }
-
-
 
 }

@@ -15,4 +15,9 @@ public class ItemDto {
     private String code;
     private Long quantity;
 
+    public ItemDto(TransactionDetail transactionDetail) {
+        this.name = transactionDetail.getName();
+        this.code = transactionDetail.getProductCode();
+        this.quantity = transactionDetail.getOrderQuantity();
+    }
 }

@@ -23,7 +23,7 @@ public class TransactionController {
     public ResponseEntity<?> createTransaction(
             @RequestBody TransactionRequest transactionRequest) {
 
-        return ResponseEntity.ok(transactionService.convertTransactionValue_v2(transactionRequest));
+        return ResponseEntity.ok(transactionService.convertTransactionValue(transactionRequest));
     }
 
     @GetMapping("")
